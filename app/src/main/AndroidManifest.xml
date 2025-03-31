@@ -35,6 +35,12 @@
             android:exported="false"
             android:label="Credits"
             android:theme="@style/Theme.CS205" />
+
+        <activity
+            android:name=".ui.LevelsActivity"
+            android:exported="false"
+            android:label="Levels"
+            android:theme="@style/Theme.CS205" />
     </application>
 
 </manifest>

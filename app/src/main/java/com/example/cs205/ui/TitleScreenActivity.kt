@@ -24,7 +24,7 @@ class TitleScreenActivity : ComponentActivity() {
                 ) {
                     TitleScreen(
                         onStartGame = { startGame() },
-                        onShowCredits = { showCredits() }
+                        onLevels = { showLevels() }
                     )
                 }
             }
@@ -33,12 +33,12 @@ class TitleScreenActivity : ComponentActivity() {
 
     private fun startGame() {
         val intent = Intent(this, GameActivity::class.java)
+        intent.putExtra("LEVEL", 1) // Start with level 1 for quick start
         startActivity(intent)
-        finish() // Close the title screen
     }
 
-    private fun showCredits() {
-        val intent = Intent(this, CreditsActivity::class.java)
+    private fun showLevels() {
+        val intent = Intent(this, LevelsActivity::class.java)
         startActivity(intent)
     }
 
@@ -56,7 +56,7 @@ class TitleScreenActivity : ComponentActivity() {
 @Composable
 fun TitleScreen(
     onStartGame: () -> Unit,
-    onShowCredits: () -> Unit
+    onLevels: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -67,42 +67,25 @@ fun TitleScreen(
     ) {
         Text(
             text = "Deadlock Dash",
-            fontSize = 48.sp,
+            style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.headlineLarge
+            modifier = Modifier.padding(bottom = 32.dp)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "Prevent deadlocks. Complete the processes.",
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge
-        )
-        
-        Spacer(modifier = Modifier.height(48.dp))
         
         Button(
             onClick = onStartGame,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp),
-            contentPadding = PaddingValues(16.dp)
+                .fillMaxWidth(0.7f)
+                .padding(bottom = 16.dp)
         ) {
-            Text("Start Game", fontSize = 20.sp)
+            Text("Quick Start")
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(
-            onClick = onShowCredits,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp),
-            contentPadding = PaddingValues(12.dp)
+            onClick = onLevels,
+            modifier = Modifier.fillMaxWidth(0.7f)
         ) {
-            Text("Credits", fontSize = 18.sp)
+            Text("Levels")
         }
     }
 } 

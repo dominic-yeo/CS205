@@ -21,7 +21,11 @@ class CreditsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    CreditsScreen()
+                    CreditsScreen(
+                        onBackToTitle = {
+                            finish() // This will close the Credits screen and return to the previous screen
+                        }
+                    )
                 }
             }
         }
@@ -29,46 +33,45 @@ class CreditsActivity : ComponentActivity() {
 }
 
 @Composable
-fun CreditsScreen() {
+fun CreditsScreen(onBackToTitle: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Add back button at the top
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Button(
+                onClick = onBackToTitle,
+                modifier = Modifier.wrapContentWidth()
+            ) {
+                Text("← Back")
+            }
+        }
+
+        // Rest of your credits content
         Text(
             text = "Credits",
-            fontSize = 32.sp,
+            style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.headlineLarge
+            modifier = Modifier.padding(bottom = 24.dp)
         )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
+
+        // Add your credits content here
         Text(
-            text = "Created by:",
-            fontSize = 20.sp,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleMedium
+            text = "Developed by:",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 16.dp)
         )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
         Text(
-            text = "Your Name",
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center,
+            text = "Your Team Names",
             style = MaterialTheme.typography.bodyLarge
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Text(
-            text = "For CS205 Operating Systems",
-            fontSize = 16.sp,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyMedium
         )
     }
 } 

@@ -24,14 +24,36 @@ import androidx.compose.ui.unit.sp
 import com.example.cs205.model.GameState
 import com.example.cs205.model.Process
 import com.example.cs205.model.Resource
+import com.example.cs205.model.ResourceInstance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.animateColorAsState
+import android.graphics.Paint
 
 class GameActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Get the level from the intent
+        val level = intent.getIntExtra("LEVEL", 1)
+        viewModel.initializeLevel(level)
+
         setContent {
             MaterialTheme {
                 Surface(
@@ -76,6 +98,10 @@ fun GameScreen(viewModel: GameViewModel, onBackToTitle: () -> Unit) {
 
 @Composable
 fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
+    val timeInSeconds = gameState.timeElapsed / 1000
+    val timePenalty = (-(timeInSeconds / 3).toInt()) // -1 point per 10 seconds
+    val finalScore = gameState.score + timePenalty
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -99,15 +125,36 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        Text(
-            text = "Final Score: ${gameState.score}",
-            style = MaterialTheme.typography.titleLarge
-        )
-        
-        Text(
-            text = "Time: ${gameState.timeElapsed / 1000}s",
-            style = MaterialTheme.typography.titleLarge
-        )
+        // Score Breakdown
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Score Breakdown",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text("Base Score: ${gameState.score}")
+                Text("Time: ${timeInSeconds}s")
+                Text("Time Penalty: $timePenalty")
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "Final Score: $finalScore",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
         
@@ -120,8 +167,20 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
     }
 }
 
+// Data class to track dragging state
+data class DragState(
+    val isDragging: Boolean = false,
+    val resourceInstance: ResourceInstance? = null,
+    val initialPosition: Offset = Offset.Zero,
+    val dragOffset: Offset = Offset.Zero
+)
+
 @Composable
 fun GamePlayScreen(gameState: GameState, viewModel: GameViewModel) {
+    var dragState by remember { mutableStateOf(DragState()) }
+    var processPositions by remember { mutableStateOf(mutableMapOf<Int, Offset>()) }
+    var processCardSizes by remember { mutableStateOf(mutableMapOf<Int, Size>()) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -169,7 +228,19 @@ fun GamePlayScreen(gameState: GameState, viewModel: GameViewModel) {
                 ProcessCard(
                     process = process,
                     isSelected = process == gameState.currentProcess,
-                    onSelect = { viewModel.selectProcess(process) }
+                    onSelect = { },
+                    collectedResources = if (process == gameState.currentProcess) {
+                        gameState.collectedResources
+                    } else {
+                        emptyList()
+                    },
+                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                        processPositions[process.id] = coordinates.boundsInWindow().topLeft
+                        processCardSizes[process.id] = Size(
+                            coordinates.size.width.toFloat(),
+                            coordinates.size.height.toFloat()
+                        )
+                    }
                 )
             }
         }
@@ -180,22 +251,72 @@ fun GamePlayScreen(gameState: GameState, viewModel: GameViewModel) {
         Text(
             text = "Resources",
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(vertical = 8.dp)
         )
 
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(gameState.availableResources) { resource ->
-                ResourceCard(
-                    resource = resource,
-                    isCollected = resource in gameState.collectedResources,
-                    isAvailable = resource.spawnTime <= gameState.timeElapsed,
-                    onCollect = { viewModel.collectResource(resource) },
+            items(
+                items = gameState.resourceInstances,
+                key = { it.instanceId }
+            ) { resourceInstance ->
+                DraggableResourceCard(
+                    resourceInstance = resourceInstance,
+                    isCollected = resourceInstance in gameState.collectedResources,
+                    isAvailable = resourceInstance.spawnTime <= gameState.timeElapsed,
+                    onDragStart = { position -> 
+                        dragState = DragState(
+                            isDragging = true,
+                            resourceInstance = resourceInstance,
+                            initialPosition = position,
+                            dragOffset = Offset.Zero
+                        )
+                    },
+                    onDrag = { _, dragAmount ->
+                        dragState = dragState.copy(
+                            dragOffset = dragState.dragOffset + dragAmount
+                        )
+                    },
+                    onDragEnd = {
+                        // Check if resource was dropped on a valid process
+                        processPositions.forEach { (processId, position) ->
+                            val size = processCardSizes[processId] ?: return@forEach
+                            val finalPosition = dragState.initialPosition + dragState.dragOffset
+                            if (finalPosition.x in position.x..(position.x + size.width) &&
+                                finalPosition.y in position.y..(position.y + size.height)
+                            ) {
+                                val process = gameState.processes.find { it.id == processId }
+                                if (process != null && !process.isCompleted) {
+                                    viewModel.selectProcess(process)
+                                    dragState.resourceInstance?.let { 
+                                        viewModel.collectResource(it)
+                                    }
+                                }
+                            }
+                        }
+                        dragState = DragState()
+                    },
+                    onDiscard = { viewModel.discardResource(resourceInstance) },
                     gameState = gameState
                 )
             }
+        }
+    }
+
+    // Render dragged resource overlay
+    if (dragState.isDragging) {
+        Box(
+            modifier = Modifier
+                .offset { 
+                    IntOffset(
+                        (dragState.initialPosition.x + dragState.dragOffset.x).roundToInt(),
+                        (dragState.initialPosition.y + dragState.dragOffset.y).roundToInt()
+                    )
+                }
+        ) {
+            dragState.resourceInstance?.let { ResourceChip(it.resource) }
         }
     }
 }
@@ -204,21 +325,50 @@ fun GamePlayScreen(gameState: GameState, viewModel: GameViewModel) {
 fun ProcessCard(
     process: Process,
     isSelected: Boolean,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
+    modifier: Modifier,
+    collectedResources: List<ResourceInstance> = emptyList()
 ) {
+    // Add animation states
+    val scale by animateFloatAsState(
+        targetValue = if (process.isCompleted) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.7f,
+            stiffness = 400f
+        ),
+        label = "scale"
+    )
+    
+    val alpha by animateFloatAsState(
+        targetValue = if (process.isCompleted) 0.9f else 1f,
+        animationSpec = tween(durationMillis = 500),
+        label = "alpha"
+    )
+
+    val backgroundColor by animateColorAsState(
+        targetValue = when {
+            process.isCompleted -> MaterialTheme.colorScheme.secondaryContainer
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surface
+        },
+        animationSpec = tween(durationMillis = 500),
+        label = "background"
+    )
+
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onSelect),
+            .scale(scale)
+            .alpha(alpha)
+            .clickable(enabled = !process.isCompleted) { onSelect() },
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
-                MaterialTheme.colorScheme.surface
+            containerColor = backgroundColor
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -229,28 +379,65 @@ fun ProcessCard(
                     text = process.name,
                     style = MaterialTheme.typography.titleMedium
                 )
+                
                 if (process.isCompleted) {
-                    Text(
-                        text = "✓",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleLarge
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Completed",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .scale(scale)
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Required Resources:",
-                style = MaterialTheme.typography.bodyMedium
-            )
             
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                process.requiredResources.forEach { resource ->
-                    ResourceChip(resource)
+            if (process.isCompleted) {
+                Text(
+                    text = "Completed!",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            } else {
+                Text(
+                    text = "Needs:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Group required resources by their ID and count occurrences
+                val requiredCounts = process.requiredResources
+                    .groupBy { it.id }
+                    .mapValues { it.value.size }
+                
+                // Count collected resources by their ID
+                val collectedCounts = collectedResources
+                    .groupBy { it.resource.id }
+                    .mapValues { it.value.size }
+                
+                // Display each unique required resource with its count
+                requiredCounts.forEach { (resourceId, requiredCount) ->
+                    val resource = process.requiredResources.first { it.id == resourceId }
+                    val collectedCount = collectedCounts[resourceId] ?: 0
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        ResourceChip(
+                            resource = resource,
+                            isFulfilled = collectedCount >= requiredCount
+                        )
+                        Text(
+                            text = "$collectedCount/$requiredCount",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (collectedCount >= requiredCount) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -258,29 +445,45 @@ fun ProcessCard(
 }
 
 @Composable
-fun ResourceCard(
-    resource: Resource,
+fun DraggableResourceCard(
+    resourceInstance: ResourceInstance,
     isCollected: Boolean,
     isAvailable: Boolean,
-    onCollect: () -> Unit,
+    onDragStart: (Offset) -> Unit,
+    onDrag: (change: Offset, dragAmount: Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDiscard: () -> Unit,
     gameState: GameState
 ) {
-    val canCollect = isAvailable && 
-                     gameState.currentProcess != null && 
-                     gameState.currentProcess.requiredResources.any { it.id == resource.id }
+    var cardPosition by remember { mutableStateOf(Offset.Zero) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
-                onClick = onCollect,
-                enabled = canCollect
-            ),
+            .onGloballyPositioned { coordinates ->
+                // Store the card's position
+                cardPosition = coordinates.boundsInWindow().topLeft
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        if (isAvailable && !isCollected) {
+                            // Pass the absolute position (card position + touch offset)
+                            onDragStart(cardPosition + offset)
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(change.position, dragAmount)
+                    },
+                    onDragEnd = { onDragEnd() },
+                    onDragCancel = { onDragEnd() }
+                )
+            },
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isCollected -> MaterialTheme.colorScheme.secondaryContainer
                 !isAvailable -> MaterialTheme.colorScheme.surfaceVariant
-                !canCollect -> MaterialTheme.colorScheme.errorContainer
                 else -> MaterialTheme.colorScheme.surface
             }
         )
@@ -296,34 +499,47 @@ fun ResourceCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ResourceChip(resource)
+                ResourceChip(resourceInstance.resource)
                 Text(
-                    text = resource.name,
+                    text = resourceInstance.resource.name,
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
-            when {
-                isCollected -> Text("✓", color = MaterialTheme.colorScheme.primary)
-                !isAvailable -> Text("⏳", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                gameState.currentProcess == null -> Text("Select a process first", 
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error)
-                !gameState.currentProcess.requiredResources.any { it.id == resource.id } -> 
-                    Text("Not needed by selected process",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                when {
+                    isCollected -> Text("✓", color = MaterialTheme.colorScheme.primary)
+                    !isAvailable -> Text("⏳", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!isCollected) {
+                    IconButton(
+                        onClick = onDiscard,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Text("×", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun ResourceChip(resource: Resource) {
+fun ResourceChip(
+    resource: Resource,
+    isFulfilled: Boolean = false
+) {
     Box(
         modifier = Modifier
             .size(24.dp)
             .clip(CircleShape)
             .background(Color(resource.color))
-            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            .border(
+                width = if (isFulfilled) 2.dp else 1.dp,
+                color = if (isFulfilled) Color.Green else MaterialTheme.colorScheme.outline,
+                shape = CircleShape
+            )
     )
-} 
+}
