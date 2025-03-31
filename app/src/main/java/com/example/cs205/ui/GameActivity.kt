@@ -90,17 +90,26 @@ fun GameScreen(viewModel: GameViewModel, onBackToTitle: () -> Unit) {
     }
 
     if (gameState.isGameWon) {
-        WinScreen(gameState, onBackToTitle)
+        WinScreen(gameState, viewModel, onBackToTitle)
     } else {
         GamePlayScreen(gameState, viewModel)
     }
 }
 
 @Composable
-fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
+fun WinScreen(
+    gameState: GameState,
+    viewModel: GameViewModel,
+    onBackToTitle: () -> Unit
+) {
     val timeInSeconds = gameState.timeElapsed / 1000
     val timePenalty = (-(timeInSeconds / 3).toInt()) // -1 point per 10 seconds
     val finalScore = gameState.score + timePenalty
+
+    // Check and update high score when the screen is first displayed
+    LaunchedEffect(Unit) {
+        viewModel.checkAndUpdateHighScore(finalScore, gameState.level)
+    }
 
     Column(
         modifier = Modifier
@@ -153,6 +162,24 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
+                
+                // Add high score comparison
+                val highScore = viewModel.highScore
+                if (finalScore > highScore) {
+                    Text(
+                        text = "🏆 New High Score!",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else {
+                    Text(
+                        text = "High Score: $highScore",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
         

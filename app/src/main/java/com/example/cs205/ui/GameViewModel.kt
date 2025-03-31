@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.example.cs205.data.HighScoreDbHelper
 import com.example.cs205.model.GameState
 import com.example.cs205.model.Process
 import com.example.cs205.model.Resource
@@ -26,9 +27,17 @@ class GameViewModel(private val context: Context) : ViewModel() {
     private var nextResourceIndex = 0
     private val MAX_RESOURCES = 5
 
+    private val highScoreDbHelper = HighScoreDbHelper(context)
+    private var _highScore by mutableStateOf(0)
+    val highScore: Int get() = _highScore
+
     init {
         startTime = System.currentTimeMillis()
         lastResourceSpawnTime = startTime
+        // Load the high score for the current level
+        _gameState.value.level.let { level ->
+            _highScore = highScoreDbHelper.getHighScore(level)
+        }
     }
 
     private fun returnResourcesToPool(currentState: GameState, resourcesToReturn: List<ResourceInstance>): List<ResourceInstance> {
@@ -189,6 +198,7 @@ class GameViewModel(private val context: Context) : ViewModel() {
         _gameState.update { 
             createInitialGameState(level)
         }
+        _highScore = highScoreDbHelper.getHighScore(level)
     }
 
     private fun createInitialGameState(level: Int = 1): GameState {
@@ -298,5 +308,13 @@ class GameViewModel(private val context: Context) : ViewModel() {
             )
         }
         return state
+    }
+
+    fun checkAndUpdateHighScore(finalScore: Int, level: Int) {
+        val currentHighScore = highScoreDbHelper.getHighScore(level)
+        if (finalScore > currentHighScore) {
+            highScoreDbHelper.updateHighScore(level, finalScore)
+            _highScore = finalScore
+        }
     }
 } 
