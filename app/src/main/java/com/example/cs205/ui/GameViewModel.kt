@@ -1,5 +1,6 @@
 package com.example.cs205.ui
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,12 +9,13 @@ import com.example.cs205.model.GameState
 import com.example.cs205.model.Process
 import com.example.cs205.model.Resource
 import com.example.cs205.model.ResourceInstance
+import com.example.cs205.util.VibrationUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class GameViewModel : ViewModel() {
+class GameViewModel(private val context: Context) : ViewModel() {
     private val _gameState = MutableStateFlow(createInitialGameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
@@ -84,6 +86,9 @@ class GameViewModel : ViewModel() {
                     newCollectedResources.count { it.resource.id == required.id } >= 
                     currentProcess.requiredResources.count { it.id == required.id }
                 }) {
+                    // Trigger vibration when process completes with a longer duration
+                    VibrationUtil.vibrate(context, 500)
+                    
                     val updatedProcesses = currentState.processes.map { 
                         if (it.id == currentProcess.id) it.copy(isCompleted = true)
                         else it

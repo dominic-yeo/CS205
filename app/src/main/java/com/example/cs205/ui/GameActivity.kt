@@ -45,7 +45,7 @@ import androidx.compose.animation.animateColorAsState
 import android.graphics.Paint
 
 class GameActivity : ComponentActivity() {
-    private val viewModel: GameViewModel by viewModels()
+    private val viewModel: GameViewModel by viewModels { GameViewModelFactory(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
