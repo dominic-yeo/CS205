@@ -129,17 +129,17 @@ fun TitleScreen(
             Text("Levels")
         }
 
-        // Add reset button
-        OutlinedButton(
-            onClick = onResetHighScores,
-            modifier = Modifier
-                .fillMaxWidth(0.7f)
-                .padding(top = 8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error
-            )
-        ) {
-            Text("Reset High Scores")
-        }
+        // // Add reset button
+        // OutlinedButton(
+        //     onClick = onResetHighScores,
+        //     modifier = Modifier
+        //         .fillMaxWidth(0.7f)
+        //         .padding(top = 8.dp),
+        //     colors = ButtonDefaults.outlinedButtonColors(
+        //         contentColor = MaterialTheme.colorScheme.error
+        //     )
+        // ) {
+        //     Text("Reset High Scores")
+        // }
     }
 } 

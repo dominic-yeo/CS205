@@ -167,6 +167,7 @@ fun WinScreen(
                 // which returns Unit.
             }
         }
+    }
     // Check and update high score when the screen is first displayed
     LaunchedEffect(Unit) {
         viewModel.checkAndUpdateHighScore(finalScore, gameState.level)
@@ -261,7 +262,7 @@ fun WinScreen(
             },
             modifier = Modifier.fillMaxWidth(0.7f)
         ) {
-            Text("Save High Score")
+            Text("Share High Score")
         }
     }
 }
