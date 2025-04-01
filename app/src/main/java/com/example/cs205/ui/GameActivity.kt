@@ -118,7 +118,7 @@ fun shareBitmap(context: Context, bitmap: Bitmap) {
 
         val uri = FileProvider.getUriForFile(
             context,
-            "${context.packageName}.fileprovider", // Replace with your actual FileProvider authority
+            "com.example.cs205.fileprovider",
             file
         )
 
