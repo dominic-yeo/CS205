@@ -56,7 +56,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 class GameActivity : ComponentActivity() {
-    private val viewModel: GameViewModel by viewModels()
+    private val viewModel: GameViewModel by viewModels { GameViewModelFactory(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,7 +101,7 @@ fun GameScreen(viewModel: GameViewModel, onBackToTitle: () -> Unit) {
     }
 
     if (gameState.isGameWon) {
-        WinScreen(gameState, onBackToTitle)
+        WinScreen(gameState, viewModel, onBackToTitle)
     } else {
         GamePlayScreen(gameState, viewModel)
     }
@@ -137,7 +137,11 @@ fun shareBitmap(context: Context, bitmap: Bitmap) {
 }
 
 @Composable
-fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
+fun WinScreen(
+    gameState: GameState,
+    viewModel: GameViewModel,
+    onBackToTitle: () -> Unit
+) {
     val timeInSeconds = gameState.timeElapsed / 1000
     val timePenalty = (-(timeInSeconds / 3).toInt()) // -1 point per 10 seconds
     val finalScore = gameState.score + timePenalty
@@ -163,6 +167,9 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
                 // which returns Unit.
             }
         }
+    // Check and update high score when the screen is first displayed
+    LaunchedEffect(Unit) {
+        viewModel.checkAndUpdateHighScore(finalScore, gameState.level)
     }
 
     Column(
@@ -216,6 +223,24 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
+                
+                // Add high score comparison
+                val highScore = viewModel.highScore
+                if (finalScore > highScore) {
+                    Text(
+                        text = "🏆 New High Score!",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else {
+                    Text(
+                        text = "High Score: $highScore",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
         

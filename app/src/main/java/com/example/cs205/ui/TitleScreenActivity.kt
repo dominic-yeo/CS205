@@ -6,14 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cs205.data.HighScoreDbHelper
 
 class TitleScreenActivity : ComponentActivity() {
+    private val highScoreDbHelper by lazy { HighScoreDbHelper(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -22,9 +25,16 @@ class TitleScreenActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    var currentHighScore by remember { mutableStateOf(highScoreDbHelper.getHighScore(1)) }
+                    
                     TitleScreen(
                         onStartGame = { startGame() },
-                        onLevels = { showLevels() }
+                        onLevels = { showLevels() },
+                        highScore = currentHighScore,
+                        onResetHighScores = {
+                            highScoreDbHelper.resetAllHighScores()
+                            currentHighScore = 0
+                        }
                     )
                 }
             }
@@ -56,7 +66,9 @@ class TitleScreenActivity : ComponentActivity() {
 @Composable
 fun TitleScreen(
     onStartGame: () -> Unit,
-    onLevels: () -> Unit
+    onLevels: () -> Unit,
+    highScore: Int,
+    onResetHighScores: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -72,6 +84,33 @@ fun TitleScreen(
             modifier = Modifier.padding(bottom = 32.dp)
         )
         
+        // High score display
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "High Score",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = highScore.toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        
         Button(
             onClick = onStartGame,
             modifier = Modifier
@@ -83,9 +122,24 @@ fun TitleScreen(
 
         Button(
             onClick = onLevels,
-            modifier = Modifier.fillMaxWidth(0.7f)
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .padding(bottom = 16.dp)
         ) {
             Text("Levels")
+        }
+
+        // Add reset button
+        OutlinedButton(
+            onClick = onResetHighScores,
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .padding(top = 8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Text("Reset High Scores")
         }
     }
 } 
