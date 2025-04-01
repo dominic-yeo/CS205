@@ -1,6 +1,9 @@
 package com.example.cs205.ui
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,6 +46,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import android.graphics.Paint
+import android.util.Log
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 class GameActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels()
@@ -96,11 +107,63 @@ fun GameScreen(viewModel: GameViewModel, onBackToTitle: () -> Unit) {
     }
 }
 
+fun shareBitmap(context: Context, bitmap: Bitmap) {
+    try {
+        val cachePath = File(context.cacheDir, "images")
+        cachePath.mkdirs()
+        val file = File(cachePath, "screenshot.png")
+        val fileOutputStream = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
+        fileOutputStream.close()
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider", // Replace with your actual FileProvider authority
+            file
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Share Screenshot"))
+
+    } catch (e: IOException) {
+        Log.e("WinScreen", "Error sharing bitmap: ${e.message}")
+        Toast.makeText(context, "Failed to share screenshot", Toast.LENGTH_SHORT).show()
+    }
+}
+
 @Composable
 fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
     val timeInSeconds = gameState.timeElapsed / 1000
     val timePenalty = (-(timeInSeconds / 3).toInt()) // -1 point per 10 seconds
     val finalScore = gameState.score + timePenalty
+
+    val context = LocalContext.current
+    val component = context as ComponentActivity
+    val bitmapState = remember { mutableStateOf<Bitmap?>(null) }
+
+    fun captureAndShareScreenshot() {
+        component.window?.decorView?.rootView?.let { rootView ->
+            try {
+                val bitmap = createBitmap(rootView.width, rootView.height)
+                val canvas = Canvas(bitmap)
+                rootView.draw(canvas)
+                bitmapState.value = bitmap
+                shareBitmap(context, bitmap)
+                // The last expression in the try block is the call to shareBitmap,
+                // which likely returns Unit (or its result is unused).
+            } catch (e: Exception) {
+                Log.e("WinScreen", "Error capturing screenshot: ${e.message}")
+                Toast.makeText(context, "Failed to capture screenshot", Toast.LENGTH_SHORT).show()
+                // The last expression in the catch block is the call to Toast.makeText,
+                // which returns Unit.
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -163,6 +226,17 @@ fun WinScreen(gameState: GameState, onBackToTitle: () -> Unit) {
             modifier = Modifier.fillMaxWidth(0.7f)
         ) {
             Text("Back to Title Screen")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                captureAndShareScreenshot()
+            },
+            modifier = Modifier.fillMaxWidth(0.7f)
+        ) {
+            Text("Save High Score")
         }
     }
 }
