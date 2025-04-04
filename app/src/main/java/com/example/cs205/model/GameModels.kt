@@ -18,8 +18,13 @@ data class Process(
     val id: Int,
     val name: String,
     val requiredResources: List<Resource>,
-    val isCompleted: Boolean = false
-)
+    val isCompleted: Boolean = false,
+    val priority: Priority = Priority.Medium
+) {
+    enum class Priority {
+        Low, Medium, High
+    }
+}
 
 data class GameState(
     val processes: List<Process>,

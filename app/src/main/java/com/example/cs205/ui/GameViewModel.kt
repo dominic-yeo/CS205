@@ -89,36 +89,51 @@ class GameViewModel(private val context: Context) : ViewModel() {
                 resourceInstance.spawnTime <= currentState.timeElapsed) {
                 
                 val newCollectedResources = currentState.collectedResources + resourceInstance
-                
-                // Check if process is completed
-                if (currentProcess.requiredResources.all { required ->
-                    newCollectedResources.count { it.resource.id == required.id } >= 
-                    currentProcess.requiredResources.count { it.id == required.id }
-                }) {
+
+                // Check if process has all resources
+                val allCollected = currentProcess.requiredResources.all { required ->
+                    newCollectedResources.count { it.resource.id == required.id } >=
+                            currentProcess.requiredResources.count { it.id == required.id }
+                }
+
+                // Check if higher priority process NOT completed
+                val higherCheck = currentState.processes.any {
+                    it.priority.ordinal > currentProcess.priority.ordinal && !it.isCompleted
+                }
+
+                // If all resources, but there is higher priority process, do not complete
+                if (allCollected && higherCheck) {
+                    currentState.copy(
+                        collectedResources = newCollectedResources,
+                        resourceInstances = currentState.resourceInstances.filterNot {
+                            it.instanceId == resourceInstance.instanceId
+                        }
+                    )
+                } else if (allCollected) {
                     // Trigger vibration when process completes with a longer duration
                     VibrationUtil.vibrate(context, 500)
-                    
-                    val updatedProcesses = currentState.processes.map { 
+
+                    val updatedProcesses = currentState.processes.map {
                         if (it.id == currentProcess.id) it.copy(isCompleted = true)
                         else it
                     }
-                    
+
                     val isGameWon = updatedProcesses.all { it.isCompleted }
                     if (isGameWon) {
                         isGameActive = false
                     }
-                    
+
                     // First remove the just-collected resource from resourceInstances
-                    val updatedResourceInstances = currentState.resourceInstances.filterNot { 
-                        it.instanceId == resourceInstance.instanceId 
+                    val updatedResourceInstances = currentState.resourceInstances.filterNot {
+                        it.instanceId == resourceInstance.instanceId
                     }
-                    
+
                     // Then try to return all collected resources to the pool
                     val returnedResources = returnResourcesToPool(
-                        currentState.copy(resourceInstances = updatedResourceInstances), 
+                        currentState.copy(resourceInstances = updatedResourceInstances),
                         newCollectedResources
                     )
-                    
+
                     currentState.copy(
                         processes = updatedProcesses,
                         currentProcess = null,
@@ -165,8 +180,8 @@ class GameViewModel(private val context: Context) : ViewModel() {
                 return@update currentState
             }
 
-            if (currentState.level == 2) {
-                // For level 2, randomly select a resource to spawn
+            if (currentState.level >= 2) {
+                // For level 2+, randomly select a resource to spawn
                 val resource = currentState.availableResources.random()
                 val newInstance = ResourceInstance(
                     resource = resource,
@@ -241,6 +256,13 @@ class GameViewModel(private val context: Context) : ViewModel() {
                     
                     Process(processId, "Process ${('A' + processId - 1)}", requirements)
                 }
+            }
+            3 -> {
+                listOf(
+                    Process(1, "High Priority Process", listOf(resources[0], resources[1]), false, Process.Priority.High),
+                    Process(2, "Medium Priority Process", listOf(resources[1], resources[2], resources[3]), false, Process.Priority.Medium),
+                    Process(3, "Low Priority Process", listOf(resources[0], resources[3], resources[4]), false, Process.Priority.Low)
+                )
             }
             else -> listOf()
         }

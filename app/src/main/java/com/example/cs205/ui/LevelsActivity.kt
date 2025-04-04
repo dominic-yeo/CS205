@@ -64,7 +64,7 @@ fun LevelsScreen(onLevelSelected: (Int) -> Unit, onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(2) { level ->
+            items(3) { level ->
                 LevelCard(
                     level = level + 1,
                     isUnlocked = true,
@@ -72,7 +72,7 @@ fun LevelsScreen(onLevelSelected: (Int) -> Unit, onBack: () -> Unit) {
                 )
             }
             // Locked levels
-            items(2) { level ->
+            items(1) { level ->
                 LevelCard(
                     level = level + 3,
                     isUnlocked = false,
