@@ -54,6 +54,10 @@ import androidx.core.graphics.createBitmap
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import com.example.cs205.ui.components.TrailEffect
+import com.example.cs205.ui.components.ProcessCompletionEffects
+import android.media.MediaPlayer
+import android.provider.Settings
 
 class GameActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels { GameViewModelFactory(this) }
@@ -281,142 +285,164 @@ fun GamePlayScreen(gameState: GameState, viewModel: GameViewModel) {
     var processPositions by remember { mutableStateOf(mutableMapOf<Int, Offset>()) }
     var processCardSizes by remember { mutableStateOf(mutableMapOf<Int, Size>()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Score and Time
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Main game content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            Text(
-                text = "Score: ${gameState.score}",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "Time: ${gameState.timeElapsed / 1000}s",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Add instruction text
-        if (gameState.currentProcess == null) {
-            Text(
-                text = "Select a process to begin collecting resources",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
-
-        // Processes
-        Text(
-            text = "Processes",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(gameState.processes) { process ->
-                ProcessCard(
-                    process = process,
-                    isSelected = process == gameState.currentProcess,
-                    onSelect = { },
-                    collectedResources = if (process == gameState.currentProcess) {
-                        gameState.collectedResources
-                    } else {
-                        emptyList()
-                    },
-                    modifier = Modifier.onGloballyPositioned { coordinates ->
-                        processPositions[process.id] = coordinates.boundsInWindow().topLeft
-                        processCardSizes[process.id] = Size(
-                            coordinates.size.width.toFloat(),
-                            coordinates.size.height.toFloat()
-                        )
-                    }
+            // Score and Time
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Score: ${gameState.score}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Time: ${gameState.timeElapsed / 1000}s",
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Resources
-        Text(
-            text = "Resources",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
+            // Add instruction text
+            if (gameState.currentProcess == null) {
+                Text(
+                    text = "Select a process to begin collecting resources",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(
-                items = gameState.resourceInstances,
-                key = { it.instanceId }
-            ) { resourceInstance ->
-                DraggableResourceCard(
-                    resourceInstance = resourceInstance,
-                    isCollected = resourceInstance in gameState.collectedResources,
-                    isAvailable = resourceInstance.spawnTime <= gameState.timeElapsed,
-                    onDragStart = { position -> 
-                        dragState = DragState(
-                            isDragging = true,
-                            resourceInstance = resourceInstance,
-                            initialPosition = position,
-                            dragOffset = Offset.Zero
-                        )
-                    },
-                    onDrag = { _, dragAmount ->
-                        dragState = dragState.copy(
-                            dragOffset = dragState.dragOffset + dragAmount
-                        )
-                    },
-                    onDragEnd = {
-                        // Check if resource was dropped on a valid process
-                        processPositions.forEach { (processId, position) ->
-                            val size = processCardSizes[processId] ?: return@forEach
-                            val finalPosition = dragState.initialPosition + dragState.dragOffset
-                            if (finalPosition.x in position.x..(position.x + size.width) &&
-                                finalPosition.y in position.y..(position.y + size.height)
-                            ) {
-                                val process = gameState.processes.find { it.id == processId }
-                                if (process != null && !process.isCompleted) {
-                                    viewModel.selectProcess(process)
-                                    dragState.resourceInstance?.let { 
-                                        viewModel.collectResource(it)
+            // Processes
+            Text(
+                text = "Processes",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(gameState.processes) { process ->
+                    ProcessCard(
+                        process = process,
+                        isSelected = process == gameState.currentProcess,
+                        onSelect = { viewModel.selectProcess(process) },
+                        collectedResources = if (process == gameState.currentProcess) {
+                            gameState.collectedResources
+                        } else {
+                            emptyList()
+                        },
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            processPositions[process.id] = coordinates.boundsInWindow().topLeft
+                            processCardSizes[process.id] = Size(
+                                coordinates.size.width.toFloat(),
+                                coordinates.size.height.toFloat()
+                            )
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Resources
+            Text(
+                text = "Resources",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = gameState.resourceInstances,
+                    key = { it.instanceId }
+                ) { resourceInstance ->
+                    DraggableResourceCard(
+                        resourceInstance = resourceInstance,
+                        isCollected = resourceInstance in gameState.collectedResources,
+                        isAvailable = resourceInstance.spawnTime <= gameState.timeElapsed,
+                        onDragStart = { position -> 
+                            dragState = DragState(
+                                isDragging = true,
+                                resourceInstance = resourceInstance,
+                                initialPosition = position,
+                                dragOffset = Offset.Zero
+                            )
+                        },
+                        onDrag = { _, dragAmount ->
+                            dragState = dragState.copy(
+                                dragOffset = dragState.dragOffset + dragAmount
+                            )
+                        },
+                        onDragEnd = {
+                            // Check if resource was dropped on a valid process
+                            processPositions.forEach { (processId, position) ->
+                                val size = processCardSizes[processId] ?: return@forEach
+                                val finalPosition = dragState.initialPosition + dragState.dragOffset
+                                if (finalPosition.x in position.x..(position.x + size.width) &&
+                                    finalPosition.y in position.y..(position.y + size.height)
+                                ) {
+                                    val process = gameState.processes.find { it.id == processId }
+                                    if (process != null && !process.isCompleted) {
+                                        viewModel.selectProcess(process)
+                                        dragState.resourceInstance?.let { 
+                                            viewModel.collectResource(it)
+                                        }
                                     }
                                 }
                             }
-                        }
-                        dragState = DragState()
-                    },
-                    onDiscard = { viewModel.discardResource(resourceInstance) },
-                    gameState = gameState
+                            dragState = DragState()
+                        },
+                        onDiscard = { viewModel.discardResource(resourceInstance) },
+                        gameState = gameState
+                    )
+                }
+            }
+        }
+
+        // Trail effect - positioned as overlay in the Box
+        if (dragState.isDragging) {
+            val currentPosition = dragState.initialPosition + dragState.dragOffset
+            dragState.resourceInstance?.let { resource ->
+                TrailEffect(
+                    isDragging = true,
+                    currentPosition = currentPosition,
+                    color = Color(resource.resource.color),
+                    maxPoints = 30,
+                    tailLifetime = 700,
+                    pointSpacing = 4,
+                    headSize = 0f
                 )
             }
         }
-    }
 
-    // Render dragged resource overlay
-    if (dragState.isDragging) {
-        Box(
-            modifier = Modifier
-                .offset { 
-                    IntOffset(
-                        (dragState.initialPosition.x + dragState.dragOffset.x).roundToInt(),
-                        (dragState.initialPosition.y + dragState.dragOffset.y).roundToInt()
-                    )
-                }
-        ) {
-            dragState.resourceInstance?.let { ResourceChip(it.resource) }
+        // Dragged resource - on top of everything
+        if (dragState.isDragging) {
+            Box(
+                modifier = Modifier
+                    .offset { 
+                        IntOffset(
+                            (dragState.initialPosition.x + dragState.dragOffset.x).roundToInt(),
+                            (dragState.initialPosition.y + dragState.dragOffset.y).roundToInt()
+                        )
+                    }
+            ) {
+                ResourceChip(
+                    resource = dragState.resourceInstance?.resource ?: return@Box,
+                    size = 32.dp  // Make the dragged resource slightly larger
+                )
+            }
         }
     }
 }
@@ -429,6 +455,11 @@ fun ProcessCard(
     modifier: Modifier,
     collectedResources: List<ResourceInstance> = emptyList()
 ) {
+    // Track if we should show the completion effect
+    var showCompletionEffect by remember { mutableStateOf(false) }
+    var scoreVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
     // Add animation states
     val scale by animateFloatAsState(
         targetValue = if (process.isCompleted) 1.05f else 1f,
@@ -437,6 +468,23 @@ fun ProcessCard(
             stiffness = 400f
         ),
         label = "scale"
+    )
+    
+    // Animated values for score floating upward
+    val scoreYOffset by animateFloatAsState(
+        targetValue = if (scoreVisible) -80f else 0f,
+        animationSpec = tween(2000, easing = FastOutSlowInEasing),
+        label = "scoreYOffset"
+    )
+    
+    // Animated value for score fading out
+    val scoreOpacity by animateFloatAsState(
+        targetValue = if (scoreVisible) 0f else 1f,
+        animationSpec = tween(2000, easing = LinearEasing),
+        finishedListener = { 
+            if (scoreVisible) scoreVisible = false 
+        },
+        label = "scoreOpacity"
     )
     
     val alpha by animateFloatAsState(
@@ -455,91 +503,140 @@ fun ProcessCard(
         label = "background"
     )
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .alpha(alpha)
-            .clickable(enabled = !process.isCompleted) { onSelect() },
-        colors = CardDefaults.cardColors(
-            containerColor = backgroundColor
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = process.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                if (process.isCompleted) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Completed",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .scale(scale)
-                    )
+    // Detect process completion to trigger effects
+    LaunchedEffect(process.isCompleted) {
+        if (process.isCompleted) {
+            showCompletionEffect = true
+            scoreVisible = true
+            
+            // Play completion sound
+            try {
+                // Use a system sound that exists in Android
+                val soundId = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
+                val mediaPlayer = MediaPlayer().apply {
+                    setDataSource(context, soundId)
+                    prepare()
+                    start()
+                    setOnCompletionListener { mp -> mp.release() }
                 }
+            } catch (e: Exception) {
+                Log.e("ProcessCard", "Error playing sound: ${e.message}")
             }
             
-            if (process.isCompleted) {
-                Text(
-                    text = "Completed!",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            } else {
-                Text(
-                    text = "Needs:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                // Group required resources by their ID and count occurrences
-                val requiredCounts = process.requiredResources
-                    .groupBy { it.id }
-                    .mapValues { it.value.size }
-                
-                // Count collected resources by their ID
-                val collectedCounts = collectedResources
-                    .groupBy { it.resource.id }
-                    .mapValues { it.value.size }
-                
-                // Display each unique required resource with its count
-                requiredCounts.forEach { (resourceId, requiredCount) ->
-                    val resource = process.requiredResources.first { it.id == resourceId }
-                    val collectedCount = collectedCounts[resourceId] ?: 0
+            // Reset completion effect after some time
+            kotlinx.coroutines.delay(2000)
+            showCompletionEffect = false
+            // Note: The score animation will finish on its own
+        }
+    }
+
+    Box {
+        // The main card
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .scale(scale)
+                .alpha(alpha)
+                .clickable(enabled = !process.isCompleted) { onSelect() },
+            colors = CardDefaults.cardColors(
+                containerColor = backgroundColor
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = process.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        ResourceChip(
-                            resource = resource,
-                            isFulfilled = collectedCount >= requiredCount
-                        )
-                        Text(
-                            text = "$collectedCount/$requiredCount",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (collectedCount >= requiredCount) 
-                                MaterialTheme.colorScheme.primary 
-                            else 
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                    if (process.isCompleted) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Completed",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .scale(scale)
                         )
                     }
                 }
+                
+                if (process.isCompleted) {
+                    Text(
+                        text = "Completed!",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Needs:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    // Group required resources by their ID and count occurrences
+                    val requiredCounts = process.requiredResources
+                        .groupBy { it.id }
+                        .mapValues { it.value.size }
+                    
+                    // Count collected resources by their ID
+                    val collectedCounts = collectedResources
+                        .groupBy { it.resource.id }
+                        .mapValues { it.value.size }
+                    
+                    // Display each unique required resource with its count
+                    requiredCounts.forEach { (resourceId, requiredCount) ->
+                        val resource = process.requiredResources.first { it.id == resourceId }
+                        val collectedCount = collectedCounts[resourceId] ?: 0
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            ResourceChip(
+                                resource = resource,
+                                isFulfilled = collectedCount >= requiredCount
+                            )
+                            Text(
+                                text = "$collectedCount/$requiredCount",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (collectedCount >= requiredCount) 
+                                    MaterialTheme.colorScheme.primary 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
+        }
+        
+        // Process completion effect overlay
+        ProcessCompletionEffects(
+            isCompleted = showCompletionEffect && process.isCompleted,
+            modifier = Modifier.fillMaxSize()
+        )
+        
+        // Floating score animation - float up and fade away
+        if (scoreVisible) {
+            Text(
+                text = "+100",
+                color = Color(0xFF4CAF50),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = scoreYOffset.dp)
+                    .alpha(1f - scoreOpacity)
+            )
         }
     }
 }
@@ -629,11 +726,12 @@ fun DraggableResourceCard(
 @Composable
 fun ResourceChip(
     resource: Resource,
-    isFulfilled: Boolean = false
+    isFulfilled: Boolean = false,
+    size: androidx.compose.ui.unit.Dp = 24.dp
 ) {
     Box(
         modifier = Modifier
-            .size(24.dp)
+            .size(size)
             .clip(CircleShape)
             .background(Color(resource.color))
             .border(
