@@ -34,6 +34,12 @@
             android:theme="@style/Theme.CS205" />
 
         <activity
+            android:name=".ui.ShopActivity"
+            android:exported="false"
+            android:label="Deadlock Dash"
+            android:theme="@style/Theme.CS205" />
+
+        <activity
             android:name=".ui.CreditsActivity"
             android:exported="false"
             android:label="Credits"
