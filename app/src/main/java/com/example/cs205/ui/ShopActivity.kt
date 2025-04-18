@@ -4,23 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cs205.data.ShopItem
 
-val shopItems = listOf(
-    ShopItem(
-        id = 1,
-        name = "Faster Resources I",
-        description = "Resources are produced 1s faster",
-        cost = 500,
-        effect = { gameState -> gameState.copy() }
-    )
-)
 
 class ShopActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,18 +25,19 @@ class ShopActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var score by remember { mutableIntStateOf(1000) } // Example score
+                    val context = applicationContext
+                    val gameViewModel: GameViewModel = viewModel {
+                        GameViewModel(context)
+                    }
+                    val osPoints by gameViewModel.osPoints.collectAsState(initial = 0)
+                    val shopItems by gameViewModel.shopItems.collectAsState()
+                    val activeItems by remember { derivedStateOf { gameViewModel.items.value } }
                     ShopScreen(
                         onBack = { finish() },
-                        shopItems = shopItems,
-                        osPoints = score,
+                        shopItems = shopItems.filterNot { item: ShopItem -> item.id in activeItems }, // Display unbought items
+                        osPoints = osPoints,
                         onBuy = { item ->
-                            if (score >= item.cost) {
-                                score -= item.cost
-                                item.Buy()
-                            } else {
-                                // not enough points
-                            }
+                            gameViewModel.purchaseItem(item)
                         }
                     )
                 }
@@ -66,57 +61,58 @@ fun ShopScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "OS Upgrades",
+            text = "OS Upgrades Shop",
             style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        Text(
-            text = "Welcome to the OS Upgrade Shop!",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            shopItems.forEach { item ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+        if (shopItems.isEmpty()) {
+            Text(
+                text = "Sold Out!",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                items(shopItems) { item ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
-                        Text(
-                            text = item.name,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = item.description,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = "Cost: ${item.cost}",
-                                style = MaterialTheme.typography.bodyLarge
+                                text = item.name,
+                                style = MaterialTheme.typography.titleMedium
                             )
-                            Button(
-                                onClick = { onBuy(item) },
-                                enabled = osPoints >= item.cost
+                            Text(
+                                text = item.description,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Buy")
+                                Text(
+                                    text = "Cost: ${item.cost}",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Button(
+                                    onClick = { onBuy(item) },
+                                    enabled = osPoints >= item.cost
+                                ) {
+                                    Text("Buy")
+                                }
                             }
                         }
                     }

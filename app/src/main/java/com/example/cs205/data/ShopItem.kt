@@ -8,5 +8,4 @@ data class ShopItem(
     val name: String, // Item Name
     val description: String, // Item Desc
     val cost: Int, // Item Cost
-    val effect: (GameState) -> GameState, // Item effect as function
 )
