@@ -321,16 +321,15 @@ fun WinScreen(
                             modifier = Modifier.padding(top = 12.dp)
                         )
                     }
+
+                    val points by viewModel.osPoints.collectAsState(initial = 0)
+                    Text(
+                        text = "OS Points: $points",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
-
-                val points by viewModel.osPoints.collectAsState(initial = 0)
-                Text(
-                    text = "OS Points: $points",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
             }
             
             Spacer(modifier = Modifier.height(32.dp))
