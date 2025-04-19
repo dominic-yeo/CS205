@@ -30,6 +30,7 @@ class TitleScreenActivity : ComponentActivity() {
                     TitleScreen(
                         onStartGame = { startGame() },
                         onLevels = { showLevels() },
+                        onShop = { goShop() },
                         highScore = currentHighScore,
                         onResetHighScores = {
                             highScoreDbHelper.resetAllHighScores()
@@ -52,6 +53,11 @@ class TitleScreenActivity : ComponentActivity() {
         startActivity(intent)
     }
 
+    private fun goShop() {
+        val intent = Intent(this, ShopActivity::class.java)
+        startActivity(intent)
+    }
+
     override fun onPause() {
         super.onPause()
         // TODO: Pause background music when implemented
@@ -67,6 +73,7 @@ class TitleScreenActivity : ComponentActivity() {
 fun TitleScreen(
     onStartGame: () -> Unit,
     onLevels: () -> Unit,
+    onShop: () -> Unit,
     highScore: Int,
     onResetHighScores: () -> Unit
 ) {
@@ -127,6 +134,15 @@ fun TitleScreen(
                 .padding(bottom = 16.dp)
         ) {
             Text("Levels")
+        }
+
+        Button(
+            onClick = onShop,
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .padding(bottom = 16.dp)
+        ) {
+            Text("Shop")
         }
 
         // // Add reset button

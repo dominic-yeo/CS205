@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
 import androidx.lifecycle.ViewModel
 import com.example.cs205.data.HighScoreDbHelper
+import com.example.cs205.data.OSPointsDbHelper
+import com.example.cs205.data.ShopItem
 import com.example.cs205.model.GameState
 import com.example.cs205.model.Process
 import com.example.cs205.model.Resource
@@ -18,11 +21,18 @@ import kotlinx.coroutines.flow.update
 
 class GameViewModel(private val context: Context) : ViewModel() {
     private val _gameState = MutableStateFlow(createInitialGameState())
+    private val pointsDbHelper = OSPointsDbHelper(context)
+    private val _items = mutableStateOf<Set<Int>>(emptySet())
+    val items: State<Set<Int>> = _items
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
+    private val _shopItems = MutableStateFlow<List<ShopItem>>(emptyList())
+    val shopItems: StateFlow<List<ShopItem>> = _shopItems.asStateFlow()
+    private val _osPoints = MutableStateFlow(0)
+    val osPoints: StateFlow<Int> = _osPoints.asStateFlow()
 
     private var startTime: Long = 0
     private var lastResourceSpawnTime: Long = 0
-    private val resourceSpawnInterval = 2000L // Spawn a new resource every 5 seconds
+    private var resourceSpawnInterval = 2000L // Spawn a new resource every 5 seconds
     private var isGameActive = true
     private var nextResourceIndex = 0
     private val MAX_RESOURCES = 5
@@ -38,6 +48,53 @@ class GameViewModel(private val context: Context) : ViewModel() {
         _gameState.value.level.let { level ->
             _highScore = highScoreDbHelper.getHighScore(level)
         }
+        // Load points and apply initial active item effects
+        _gameState.update { it.copy(score = pointsDbHelper.getPoints()) }
+        loadOSPoints()
+        loadActiveItems()
+        loadShopItems()
+    }
+
+    private fun loadOSPoints() {
+        _osPoints.value = pointsDbHelper.getPoints()
+    }
+
+    private fun saveActiveItem(itemId: Int, itemName: String) {
+        pointsDbHelper.addActiveItem(itemId, itemName)
+        _items.value += itemId
+    }
+
+
+    private fun loadActiveItems() {
+        _items.value = pointsDbHelper.getActiveItems().toSet()
+    }
+
+    private fun applyActiveItemEffects() {
+        if (1 in items.value) {
+            resourceSpawnInterval = 1000L
+        }
+    }
+
+    private fun loadShopItems() {
+        _shopItems.value = pointsDbHelper.getShopItems()
+    }
+
+    fun purchaseItem(item: ShopItem) {
+        val points = pointsDbHelper.getPoints()
+
+        if (points >= item.cost && item.id !in items.value) {
+            val newOsPoints = points - item.cost
+            pointsDbHelper.updatePoints(newOsPoints)
+            _osPoints.value = newOsPoints
+            saveActiveItem(item.id, item.name)
+        }
+    }
+
+    fun addPoints(pointsToAdd: Int) {
+        val currentPoints = pointsDbHelper.getPoints()
+        val newPoints = currentPoints + pointsToAdd
+        pointsDbHelper.updatePoints(newPoints)
+        _osPoints.value = newPoints
     }
 
     private fun returnResourcesToPool(currentState: GameState, resourcesToReturn: List<ResourceInstance>): List<ResourceInstance> {
@@ -195,6 +252,7 @@ class GameViewModel(private val context: Context) : ViewModel() {
     }
 
     fun initializeLevel(level: Int) {
+        applyActiveItemEffects()
         _gameState.update { 
             createInitialGameState(level)
         }
@@ -316,5 +374,11 @@ class GameViewModel(private val context: Context) : ViewModel() {
             highScoreDbHelper.updateHighScore(level, finalScore)
             _highScore = finalScore
         }
+    }
+
+    fun getPoints(): Int = _gameState.value.score
+
+    fun savePoints() {
+        pointsDbHelper.updatePoints(_gameState.value.score)
     }
 } 

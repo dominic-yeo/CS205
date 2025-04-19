@@ -195,7 +195,9 @@ fun WinScreen(
     }
     
     // Check and update high score when the screen is first displayed
+    // Add score as points for shop
     LaunchedEffect(Unit) {
+        viewModel.addPoints(finalScore)
         viewModel.checkAndUpdateHighScore(finalScore, gameState.level)
         
         // Play a victory sound
@@ -319,6 +321,14 @@ fun WinScreen(
                             modifier = Modifier.padding(top = 12.dp)
                         )
                     }
+
+                    val points by viewModel.osPoints.collectAsState(initial = 0)
+                    Text(
+                        text = "OS Points: $points",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
             
